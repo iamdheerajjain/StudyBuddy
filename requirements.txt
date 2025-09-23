@@ -1,0 +1,39 @@
+# Core Dependencies
+flask
+flask-cors
+python-dotenv
+
+# AI/ML Libraries
+langchain
+langchain-google-genai
+langchain-community
+langchain-ollama
+google-generativeai
+torch
+
+# Document Processing
+pypdf
+mistune
+
+# Web Scraping & Search
+beautifulsoup4
+requests
+tavily-python
+youtube-search-python
+serpapi
+
+# Computer Vision & OCR
+opencv-python
+pillow
+numpy
+pytesseract
+ultralytics
+
+# Speech Processing (optional; keep only those you use)
+pyttsx3
+speechrecognition
+# pyaudio  # enable if using microphone capture locally
+openai-whisper
+
+# Vector Storage
+faiss-cpu
