@@ -2469,7 +2469,7 @@ export default function Dashboard() {
                       </div>
 
                       {/* Search Results */}
-                      {searchResult && searchResult.search_data && (
+                      {searchResult?.search_data ? (
                         <div className="space-y-6">
                           {/* Results Header */}
                           <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-[color:var(--accent)]/10 to-[color:var(--accent-alt)]/10 border border-[color:var(--accent)]/20">
@@ -2824,7 +2824,7 @@ export default function Dashboard() {
                             </button>
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
