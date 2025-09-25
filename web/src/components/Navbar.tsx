@@ -45,18 +45,20 @@ export default function Navbar() {
           href="/"
           className="font-bold tracking-tight text-2xl sm:text-2xl hover-lift group transition-all duration-300"
         >
-          <span className="text-gradient-primary group-hover:animate-glow-pulse">Mentorae</span>
+          <span className="text-gradient-primary group-hover:animate-glow-pulse">
+            studybuddy
+          </span>
         </Link>
-        
+
         <nav className="hidden items-center gap-1 md:flex">
-          <Link 
-            href="/dashboard" 
+          <Link
+            href="/dashboard"
             className="relative px-4 py-2 rounded-xl font-medium text-[color:var(--foreground)] hover:text-[color:var(--accent)] transition-all duration-300 group"
           >
             <span className="relative z-10">Dashboard</span>
             <div className="absolute inset-0 bg-gradient-to-r from-[color:var(--accent)]/10 to-[color:var(--accent-alt)]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </Link>
-          
+
           {isAuthed ? (
             <Link
               href="/profile"
@@ -70,7 +72,7 @@ export default function Navbar() {
             </Link>
           )}
         </nav>
-        
+
         <button
           aria-label="Toggle menu"
           aria-expanded={isOpen}
@@ -80,26 +82,34 @@ export default function Navbar() {
           onClick={() => setIsOpen((v) => !v)}
         >
           <div className="relative w-5 h-5">
-            <span className={`absolute top-0 left-0 w-full h-0.5 bg-[color:var(--foreground)] transition-all duration-300 ${
-              isOpen ? 'rotate-45 translate-y-2' : ''
-            }`} />
-            <span className={`absolute top-2 left-0 w-full h-0.5 bg-[color:var(--foreground)] transition-all duration-300 ${
-              isOpen ? 'opacity-0' : ''
-            }`} />
-            <span className={`absolute top-4 left-0 w-full h-0.5 bg-[color:var(--foreground)] transition-all duration-300 ${
-              isOpen ? '-rotate-45 -translate-y-2' : ''
-            }`} />
+            <span
+              className={`absolute top-0 left-0 w-full h-0.5 bg-[color:var(--foreground)] transition-all duration-300 ${
+                isOpen ? "rotate-45 translate-y-2" : ""
+              }`}
+            />
+            <span
+              className={`absolute top-2 left-0 w-full h-0.5 bg-[color:var(--foreground)] transition-all duration-300 ${
+                isOpen ? "opacity-0" : ""
+              }`}
+            />
+            <span
+              className={`absolute top-4 left-0 w-full h-0.5 bg-[color:var(--foreground)] transition-all duration-300 ${
+                isOpen ? "-rotate-45 -translate-y-2" : ""
+              }`}
+            />
           </div>
         </button>
       </div>
-      
+
       <div
         id="mobile-menu"
         ref={menuRef}
         role="dialog"
         aria-modal="true"
         className={`md:hidden absolute top-full left-0 right-0 mt-4 overflow-hidden transition-all duration-500 ease-out z-50 ${
-          isOpen ? "max-h-96 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4"
+          isOpen
+            ? "max-h-96 opacity-100 translate-y-0"
+            : "max-h-0 opacity-0 -translate-y-4"
         }`}
       >
         <div className="card-surface-premium p-6 space-y-4 backdrop-blur-premium">

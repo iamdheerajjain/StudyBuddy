@@ -50,7 +50,7 @@ default_session_id = "user_session_001"  # Default session ID
 
 @app.route("/")
 def home():
-    return jsonify({"status": "ok", "service": "Mentorae Flask API"})
+    return jsonify({"status": "ok", "service": "studybuddy Flask API"})
 
 @app.route("/status", methods=["GET"])
 def get_status():

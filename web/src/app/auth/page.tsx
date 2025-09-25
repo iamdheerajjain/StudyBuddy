@@ -2,8 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabaseBrowser, refreshSupabaseSession, checkSessionValidity } from "@/lib/supabaseClient";
-import { testSupabaseConnection, testNetworkConnectivity, testOAuthProviders, testAPIKeyValidity } from "@/lib/connectionTest";
+import {
+  supabaseBrowser,
+  refreshSupabaseSession,
+  checkSessionValidity,
+} from "@/lib/supabaseClient";
+import {
+  testSupabaseConnection,
+  testNetworkConnectivity,
+  testOAuthProviders,
+  testAPIKeyValidity,
+} from "@/lib/connectionTest";
 
 type TabKey = "email" | "oauth";
 
@@ -27,29 +36,29 @@ export default function AuthPage() {
       try {
         // First check if we have a valid session
         const sessionCheck = await checkSessionValidity();
-        
+
         if (sessionCheck.valid) {
           setUserEmail(sessionCheck.session?.user?.email ?? null);
         } else if (sessionCheck.needsRefresh) {
           // Try manual refresh if session exists but needs refresh
-          console.log('Attempting manual session refresh...');
+          console.log("Attempting manual session refresh...");
           const refreshResult = await refreshSupabaseSession();
           if (refreshResult.success) {
             setUserEmail(refreshResult.session?.user?.email ?? null);
           } else {
-            console.warn('Manual refresh failed:', refreshResult.error);
+            console.warn("Manual refresh failed:", refreshResult.error);
             setUserEmail(null);
           }
         } else {
           setUserEmail(null);
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
-        setMessage('Connection error. Please check your internet connection.');
+        console.error("Auth check failed:", error);
+        setMessage("Connection error. Please check your internet connection.");
         setUserEmail(null);
       }
     };
-    
+
     checkAuth();
   }, []);
 
@@ -59,33 +68,35 @@ export default function AuthPage() {
       : undefined;
 
   const testConnection = async () => {
-    setConnectionStatus('Testing connection...');
-    
+    setConnectionStatus("Testing connection...");
+
     // Test API key validity first
     const keyTest = testAPIKeyValidity();
     if (!keyTest.success) {
       setConnectionStatus(`❌ API Key Error: ${keyTest.error}`);
       return;
     }
-    
+
     // Test internet connectivity
     const networkTest = await testNetworkConnectivity();
     if (!networkTest.success) {
       setConnectionStatus(`❌ Network Error: ${networkTest.error}`);
       return;
     }
-    
+
     // Test Supabase connection
     const supabaseTest = await testSupabaseConnection();
     if (!supabaseTest.success) {
       setConnectionStatus(`❌ Supabase Error: ${supabaseTest.error}`);
       return;
     }
-    
+
     // Test OAuth providers
     const oauthTest = await testOAuthProviders();
     if (oauthTest.success) {
-      setConnectionStatus(`✅ Connection OK! ${keyTest.message} | ${oauthTest.message}`);
+      setConnectionStatus(
+        `✅ Connection OK! ${keyTest.message} | ${oauthTest.message}`
+      );
     } else {
       setConnectionStatus(`⚠️ OAuth Issue: ${oauthTest.error}`);
     }
@@ -134,47 +145,61 @@ export default function AuthPage() {
       `Starting OAuth | provider=${provider} | redirectTo=${redirectTo} | supabaseUrl=${process.env.NEXT_PUBLIC_SUPABASE_URL}`
     );
     setIsLoading(true);
-    
+
     try {
       console.log(`Attempting OAuth with provider: ${provider}`);
       console.log(`Redirect URL: ${redirectTo}`);
       console.log(`Supabase URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL}`);
-      
+
       const { data: oauthData, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,
-          skipBrowserRedirect: false
+          skipBrowserRedirect: false,
         },
       });
-      
+
       setIsLoading(false);
-      
+
       if (error) {
-        console.error('OAuth error details:', error);
-        console.error('Full error object:', JSON.stringify(error, null, 2));
-        
+        console.error("OAuth error details:", error);
+        console.error("Full error object:", JSON.stringify(error, null, 2));
+
         setMessage(`OAuth error: ${error.message}`);
         setDebug(
-          `OAuth failed | provider=${provider} | redirectTo=${redirectTo} | supabaseUrl=${process.env.NEXT_PUBLIC_SUPABASE_URL} | error=${error.message} | errorCode=${error.name || 'unknown'}`
+          `OAuth failed | provider=${provider} | redirectTo=${redirectTo} | supabaseUrl=${
+            process.env.NEXT_PUBLIC_SUPABASE_URL
+          } | error=${error.message} | errorCode=${error.name || "unknown"}`
         );
-        
+
         // Provide specific guidance based on error
-        if (error.message.includes('provider is not enabled')) {
-          if (provider === 'google') {
-            setMessage(`Google OAuth is not properly configured. Please check: 1) Google provider is enabled in Supabase, 2) Valid Client ID/Secret are set, 3) Authorized redirect URIs include your Supabase callback URL.`);
+        if (error.message.includes("provider is not enabled")) {
+          if (provider === "google") {
+            setMessage(
+              `Google OAuth is not properly configured. Please check: 1) Google provider is enabled in Supabase, 2) Valid Client ID/Secret are set, 3) Authorized redirect URIs include your Supabase callback URL.`
+            );
           } else {
-            setMessage(`${provider.charAt(0).toUpperCase() + provider.slice(1)} OAuth is not enabled in your Supabase project. Please enable it in the Supabase dashboard under Authentication > Providers.`);
+            setMessage(
+              `${
+                provider.charAt(0).toUpperCase() + provider.slice(1)
+              } OAuth is not enabled in your Supabase project. Please enable it in the Supabase dashboard under Authentication > Providers.`
+            );
           }
-        } else if (provider === 'google' && (error.message.includes('400') || error.message.includes('Bad Request'))) {
-          setMessage(`Google OAuth configuration error. Common fixes: 1) Check Client ID/Secret in Supabase dashboard, 2) Verify redirect URI in Google Cloud Console: https://vallfjfcjzonxcszfjjr.supabase.co/auth/v1/callback, 3) Ensure OAuth consent screen is published or you're added as test user.`);
+        } else if (
+          provider === "google" &&
+          (error.message.includes("400") ||
+            error.message.includes("Bad Request"))
+        ) {
+          setMessage(
+            `Google OAuth configuration error. Common fixes: 1) Check Client ID/Secret in Supabase dashboard, 2) Verify redirect URI in Google Cloud Console: https://vallfjfcjzonxcszfjjr.supabase.co/auth/v1/callback, 3) Ensure OAuth consent screen is published or you're added as test user.`
+          );
         }
-        
+
         return;
       }
-      
+
       if (oauthData?.url) {
-        console.log('OAuth URL generated:', oauthData.url);
+        console.log("OAuth URL generated:", oauthData.url);
         setDebug(
           `OAuth start OK | provider=${provider} | redirectTo=${redirectTo} | url=${oauthData.url}`
         );
@@ -184,8 +209,12 @@ export default function AuthPage() {
       }
     } catch (err) {
       setIsLoading(false);
-      console.error('OAuth unexpected error:', err);
-      setMessage(`Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error("OAuth unexpected error:", err);
+      setMessage(
+        `Unexpected error: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
     }
   };
 
@@ -219,10 +248,13 @@ export default function AuthPage() {
       {/* Background Elements */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-20 left-10 w-96 h-96 bg-gradient-to-br from-[color:var(--accent)]/15 to-[color:var(--accent-alt)]/15 rounded-full blur-3xl animate-float-gentle" />
-        <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-gradient-to-br from-[color:var(--accent-alt)]/10 to-[color:var(--accent)]/10 rounded-full blur-3xl animate-float-gentle" style={{animationDelay: '2s'}} />
+        <div
+          className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-gradient-to-br from-[color:var(--accent-alt)]/10 to-[color:var(--accent)]/10 rounded-full blur-3xl animate-float-gentle"
+          style={{ animationDelay: "2s" }}
+        />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-gradient-to-br from-[color:var(--accent)]/5 to-transparent rounded-full blur-3xl" />
       </div>
-      
+
       <div className="container-balanced section-padding relative z-10">
         <div
           className="mx-auto max-w-md slide-up"
@@ -232,16 +264,30 @@ export default function AuthPage() {
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[color:var(--accent)] to-[color:var(--accent-strong)] flex items-center justify-center shadow-premium">
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <svg
+                  className="w-6 h-6 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
                 </svg>
               </div>
-              <span className="text-3xl font-bold text-gradient-primary">Mentorae</span>
+              <span className="text-3xl font-bold text-gradient-primary">
+                studybuddy
+              </span>
             </div>
-            
+
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-balance mb-4">
               Welcome to the
-              <span className="block text-gradient-primary">future of learning</span>
+              <span className="block text-gradient-primary">
+                future of learning
+              </span>
             </h1>
             <p className="text-xl text-[color:var(--muted)] text-balance leading-relaxed">
               Sign in to access your AI-powered educational companion
@@ -254,23 +300,50 @@ export default function AuthPage() {
                 <div className="space-y-6">
                   <div className="glass-panel p-6 text-center">
                     <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[color:var(--success)] to-[color:var(--success)]/80 flex items-center justify-center">
-                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <svg
+                        className="w-8 h-8 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
                       </svg>
                     </div>
-                    <p className="text-sm text-[color:var(--muted)] mb-1">Successfully signed in as</p>
-                    <p className="text-xl font-bold text-gradient-primary mb-4">{userEmail}</p>
+                    <p className="text-sm text-[color:var(--muted)] mb-1">
+                      Successfully signed in as
+                    </p>
+                    <p className="text-xl font-bold text-gradient-primary mb-4">
+                      {userEmail}
+                    </p>
                     <div className="flex items-center justify-center gap-2 text-sm text-[color:var(--success)]">
                       <div className="w-2 h-2 rounded-full bg-[color:var(--success)] animate-glow-pulse" />
                       <span>Active session</span>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
-                    <Link href="/dashboard" className="btn-primary text-center py-4 hover-lift">
+                    <Link
+                      href="/dashboard"
+                      className="btn-primary text-center py-4 hover-lift"
+                    >
                       <div className="flex flex-col items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                          />
                         </svg>
                         <span className="font-semibold">Dashboard</span>
                       </div>
@@ -284,11 +357,23 @@ export default function AuthPage() {
                         {isLoading ? (
                           <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                            />
                           </svg>
                         )}
-                        <span className="font-semibold">{isLoading ? "Signing out..." : "Sign out"}</span>
+                        <span className="font-semibold">
+                          {isLoading ? "Signing out..." : "Sign out"}
+                        </span>
                       </div>
                     </button>
                   </div>
@@ -297,10 +382,12 @@ export default function AuthPage() {
                 <>
                   <div className="flex items-center justify-center gap-3 mb-2">
                     <div className="w-full h-px bg-gradient-to-r from-transparent via-[color:var(--surface-border)] to-transparent" />
-                    <span className="text-xs font-medium text-[color:var(--muted)] whitespace-nowrap px-4">Choose your method</span>
+                    <span className="text-xs font-medium text-[color:var(--muted)] whitespace-nowrap px-4">
+                      Choose your method
+                    </span>
                     <div className="w-full h-px bg-gradient-to-r from-transparent via-[color:var(--surface-border)] to-transparent" />
                   </div>
-                  
+
                   <div className="flex items-center justify-center gap-2">
                     <TabButton k="email" label="Email & Password" />
                     <TabButton k="oauth" label="Social Login" />

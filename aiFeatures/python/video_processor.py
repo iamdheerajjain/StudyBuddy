@@ -44,7 +44,7 @@ class VideoProcessor:
             # Save video temporarily with a more robust approach
             import uuid
             temp_dir = tempfile.gettempdir()
-            unique_name = f"mentorae_video_{uuid.uuid4().hex}{self._get_file_extension(video_file.filename)}"
+            unique_name = f"studybuddy_video_{uuid.uuid4().hex}{self._get_file_extension(video_file.filename)}"
             tmp_file_path = os.path.join(temp_dir, unique_name)
             
             # Save the file
@@ -329,7 +329,7 @@ class VideoProcessor:
         try:
             # Prepare temp wav path
             temp_dir = tempfile.gettempdir()
-            wav_path = os.path.join(temp_dir, f"mentorae_audio_{os.path.basename(video_path)}.wav")
+            wav_path = os.path.join(temp_dir, f"studybuddy_audio_{os.path.basename(video_path)}.wav")
             # Extract audio via ffmpeg (if available)
             try:
                 cmd = [

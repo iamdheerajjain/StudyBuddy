@@ -8,10 +8,10 @@ export default function AboutPage() {
           suppressHydrationWarning
         >
           <h1 className="text-4xl font-semibold tracking-tight text-balance">
-            About Mentorae
+            About studybuddy
           </h1>
           <p className="mt-4 text-lg text-muted text-balance">
-            Mentorae is an AI‑powered learning platform that blends
+            studybuddy is an AI‑powered learning platform that blends
             retrieval‑augmented generation, multimodal understanding, and
             thoughtful UX to help students and professionals learn efficiently.
           </p>

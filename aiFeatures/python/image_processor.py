@@ -1,5 +1,5 @@
 """
-Image Processing Module for Mentorae  
+Image Processing Module for studybuddy  
 Handles image analysis using Gemini AI model for comprehensive understanding
 """
 
@@ -62,7 +62,7 @@ class ImageProcessor:
             # Save image temporarily
             import uuid
             temp_dir = tempfile.gettempdir()
-            unique_name = f"mentorae_image_{uuid.uuid4().hex}{self._get_file_extension(image_file.filename)}"
+            unique_name = f"studybuddy_image_{uuid.uuid4().hex}{self._get_file_extension(image_file.filename)}"
             tmp_file_path = os.path.join(temp_dir, unique_name)
             
             # Save the file

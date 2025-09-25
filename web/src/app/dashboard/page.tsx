@@ -611,7 +611,7 @@ export default function Dashboard() {
                           </div>
                           <div>
                             <h2 className="text-xl font-bold text-[color:var(--foreground)]">
-                              Mentorae AI Assistant
+                              studybuddy AI Assistant
                               {status?.store_type && (
                                 <span className="ml-2 text-sm bg-gradient-to-r from-[color:var(--accent)] to-[color:var(--accent-strong)] text-white px-2 py-1 rounded-md font-medium">
                                   📚 RAG Enabled

@@ -30,7 +30,7 @@ const fontMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mentorae — AI Learning Platform",
+  title: "studybuddy — AI Learning Platform",
   description:
     "Research, explain, and practice with retrieval, citations, and multimodal AI.",
   metadataBase:
@@ -38,23 +38,23 @@ export const metadata: Metadata = {
       ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
       : undefined,
   openGraph: {
-    title: "Mentorae — AI Learning Platform",
+    title: "studybuddy — AI Learning Platform",
     description:
       "Research, explain, and practice with retrieval, citations, and multimodal AI.",
     type: "website",
-    siteName: "Mentorae",
+    siteName: "studybuddy",
     images: [
       {
         url: "/vercel.svg",
         width: 1200,
         height: 630,
-        alt: "Mentorae",
+        alt: "studybuddy",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Mentorae — AI Learning Platform",
+    title: "studybuddy — AI Learning Platform",
     description:
       "Research, explain, and practice with retrieval, citations, and multimodal AI.",
     images: ["/vercel.svg"],

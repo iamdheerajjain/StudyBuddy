@@ -29,7 +29,7 @@ export default function ContactPage() {
               const body = encodeURIComponent(
                 String(data.get("message") || "")
               );
-              window.location.href = `mailto:hello@mentorae.app?subject=${subject}&body=${body}`;
+              window.location.href = `mailto:hello@studybuddy.app?subject=${subject}&body=${body}`;
             }}
           >
             <div>
@@ -64,7 +64,7 @@ export default function ContactPage() {
               />
             </div>
             <div className="flex items-center justify-between gap-3">
-              <a href="mailto:hello@mentorae.app" className="btn-ghost">
+              <a href="mailto:hello@studybuddy.app" className="btn-ghost">
                 Email directly
               </a>
               <button className="btn-primary">Send</button>

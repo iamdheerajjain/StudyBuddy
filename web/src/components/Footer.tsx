@@ -11,14 +11,15 @@ export default function Footer() {
             <div className="flex flex-col items-start gap-3">
               <div className="flex items-center gap-3">
                 <span className="text-2xl font-bold text-gradient-primary tracking-tight">
-                  Mentorae
+                  studybuddy
                 </span>
                 <span className="px-2 py-1 bg-[color:var(--accent)]/10 text-[color:var(--accent)] rounded-md text-xs font-medium">
                   AI Education
                 </span>
               </div>
               <p className="text-[color:var(--muted)] leading-relaxed">
-                Accelerating learning with AI-powered tutoring, multimodal understanding, and intelligent assistance.
+                Accelerating learning with AI-powered tutoring, multimodal
+                understanding, and intelligent assistance.
               </p>
               <div className="flex items-center gap-2 text-xs text-[color:var(--muted)]">
                 <span>© {new Date().getFullYear()}</span>
@@ -38,9 +39,9 @@ export default function Footer() {
                 { href: "/contact", label: "Contact" },
                 { href: "/dashboard", label: "Dashboard" },
               ].map((link) => (
-                <Link 
+                <Link
                   key={link.href}
-                  href={link.href} 
+                  href={link.href}
                   className="text-[color:var(--muted)] hover:text-[color:var(--accent)] font-medium transition-all duration-300 hover-lift relative group"
                 >
                   {link.label}
@@ -52,16 +53,22 @@ export default function Footer() {
             <div className="flex flex-col items-start sm:items-end gap-4">
               <div className="flex items-center gap-4">
                 <a
-                  href="mailto:hello@mentorae.app"
+                  href="mailto:hello@studybuddy.app"
                   className="btn-ghost px-4 py-2 text-sm hover-lift"
                   aria-label="Contact us"
                 >
                   Contact
                 </a>
-                <Link href="#" className="btn-ghost px-4 py-2 text-sm hover-lift">
+                <Link
+                  href="#"
+                  className="btn-ghost px-4 py-2 text-sm hover-lift"
+                >
                   Privacy
                 </Link>
-                <Link href="#" className="btn-ghost px-4 py-2 text-sm hover-lift">
+                <Link
+                  href="#"
+                  className="btn-ghost px-4 py-2 text-sm hover-lift"
+                >
                   Terms
                 </Link>
               </div>

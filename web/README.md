@@ -1,4 +1,4 @@
-This is a Next.js app for Mentorae SaaS with:
+This is a Next.js app for studybuddy SaaS with:
 
 - React Three Fiber 3D hero
 - Supabase client scaffold

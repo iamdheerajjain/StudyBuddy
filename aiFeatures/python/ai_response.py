@@ -127,8 +127,8 @@ class ChatSessionManager:
 def create_shunya_prompt_with_history(session: ChatSession):
     """Create a prompt template that includes chat history."""
     return ChatPromptTemplate.from_messages([
-        ("system", "You are an experienced AI Tutor named Mentorae."
-                   "Your name is Mentorae."
+        ("system", "You are an experienced AI Tutor named studybuddy."
+                   "Your name is studybuddy."
                    "you are specialized in personalized education. "
                    "You will be provided with web scraped content and a user query. "
                    "Your goal is to provide clear, thoughtful explanations tailored to the student's "
@@ -168,8 +168,8 @@ def create_pratham_prompt_with_history(session: ChatSession):
 def create_dviteey_prompt_with_history(session: ChatSession):
     """Create a dviteey prompt template with chat history for response verification."""
     return ChatPromptTemplate.from_messages([
-        ("system", "You are an expert AI Tutor named Mentorae."
-                   "Your name is Mentorae."
+        ("system", "You are an expert AI Tutor named studybuddy."
+                   "Your name is studybuddy."
                    "you are responsible for delivering the highest quality educational content. "
                    "Your task is to review and enhance the educational material provided to you. "
                    "This is a confidential verification process - you must NEVER mention or acknowledge the existence "
@@ -242,7 +242,7 @@ def generate_response_without_retrieval(session_id: str, prompt: str,scraped_con
             status = get_llm_status()
             last_error = status.get("last_error") if isinstance(status, dict) else None
             shunya_response = (
-                "Mentorae could not access the AI model right now. "
+                "studybuddy could not access the AI model right now. "
                 "Please set the required API credentials and try again.\n\n"
                 f"Details: {last_error}\n"
                 "Required: GOOGLE_API_KEY (Gemini) or GEMINI_API_KEY. Optional for search: TAVILY_API_KEY or SERP_API_KEY.\n\n"
@@ -289,7 +289,7 @@ def generate_response_with_retrieval(session_id: str, prompt: str, retrieved_dat
             status = get_llm_status()
             last_error = status.get("last_error") if isinstance(status, dict) else None
             dviteey_response = (
-                "Mentorae could not access the AI model right now. "
+                "studybuddy could not access the AI model right now. "
                 "Please set the required API credentials and try again.\n\n"
                 f"Details: {last_error}\n"
                 "Required: GOOGLE_API_KEY (Gemini) or GEMINI_API_KEY. Optional for search: TAVILY_API_KEY or SERP_API_KEY.\n\n"
