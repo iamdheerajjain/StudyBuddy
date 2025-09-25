@@ -1125,9 +1125,8 @@ export default function Dashboard() {
                             </div>
                           )}
 
-                          {/* Web Sources from Search - shown only in Search tab */}
-                          {activeTab === "Search" &&
-                            searchResult &&
+                          {/* Web Sources from Search - shown when results are available */}
+                          {searchResult &&
                             searchResult.search_data &&
                             (searchResult.search_data as any)?.results && (
                               <div className="mb-4 p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
