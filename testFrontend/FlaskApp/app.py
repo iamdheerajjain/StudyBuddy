@@ -106,10 +106,13 @@ def health():
 
 @app.route("/clear-session", methods=["POST"])
 def clear_session():
-    """Clears the current RAG session and resets the vector store."""
-    global vector_store, session_manager
+    """Clears a specific chat session (if provided) and optionally resets the vector store."""
+    global vector_store, session_manager, default_session_id
     
     try:
+        data = request.json if request.json else {}
+        # If a session_id is provided clear only that session, otherwise default
+        session_id = data.get("session_id") or default_session_id
         # Handle both FAISS and hybrid vector stores
         if vector_store:
             # Try to clear hybrid store first
@@ -125,10 +128,10 @@ def clear_session():
             # For legacy FAISS, just reset the reference
             vector_store = None
         
-        # Clear the session for this user
-        session_manager.delete_session(default_session_id)
+        # Clear the session
+        session_manager.delete_session(session_id)
         
-        return jsonify({"success": True, "message": "Session cleared successfully"})
+        return jsonify({"success": True, "message": "Session cleared successfully", "session_id": session_id})
     
     except Exception as e:
         print(f"Error clearing session: {e}")
@@ -245,20 +248,49 @@ def ask():
     global vector_store, session_manager, default_session_id
     data = request.json if request.json else {}
     user_query = data.get("query")
+    web_search_results = data.get("web_search_results")  # New: web search results from frontend
+    # Optional session id to keep conversations separate per context/modality
+    session_id = data.get("session_id") or default_session_id
 
     if not user_query:
         return jsonify({"error": "No input provided"}), 400
+
+    # Debug logging for web search results
+    if web_search_results:
+        print(f"🔍 Received web search results: {len(web_search_results.get('results', []))} results")
+        print(f"   Engine used: {web_search_results.get('engine_used')}")
+        print(f"   Has answer: {bool(web_search_results.get('answer'))}")
+    else:
+        print("❌ No web search results received")
 
     try:
         # Get retrieved information if vector store exists
         retrieved_info = retrieve_answer(user_query, vector_store) if vector_store else ""
         
+        # Prepare web content for AI processing
+        web_content = ""
+        if web_search_results and web_search_results.get("results"):
+            # Format web search results for AI context
+            web_content = "\n\nWeb Search Results:\n"
+            if web_search_results.get("answer"):
+                web_content += f"AI Summary: {web_search_results['answer']}\n\n"
+            
+            for i, result in enumerate(web_search_results["results"][:5], 1):  # Use top 5 results
+                web_content += f"{i}. {result.get('title', 'No title')}\n"
+                web_content += f"   URL: {result.get('url', 'No URL')}\n"
+                web_content += f"   Description: {result.get('snippet', result.get('content', 'No description'))[:200]}...\n\n"
+        
         # Generate response based on whether retrieval was performed
         if retrieved_info:
+            # Combine retrieved info with web content
+            combined_context = retrieved_info
+            if web_content:
+                combined_context += web_content
+                
             response = generate_response_with_retrieval(
-                default_session_id, 
+                session_id, 
                 user_query,
-                retrieved_info, 
+                combined_context, 
                 session_manager
             )
             
@@ -267,15 +299,20 @@ def ask():
             return jsonify({
                 "response": response,
                 "retrieved": retrieved_info,
-                "hasRetrieval": bool(retrieved_info)
+                "hasRetrieval": bool(retrieved_info),
+                "web_sources": web_search_results.get("results", []) if web_search_results else [],
+                "hasWebSources": bool(web_search_results)
             })
             
         else:
-            # Get search content for AI processing
-            scraped_text = get_search_content_for_ai(user_query, "educational")
+            # If no web search results provided, get search content as before
+            if not web_content:
+                scraped_text = get_search_content_for_ai(user_query, "educational")
+            else:
+                scraped_text = web_content
             
             response = generate_response_without_retrieval(
-                default_session_id, 
+                session_id, 
                 user_query, 
                 scraped_text,
                 session_manager
@@ -286,7 +323,9 @@ def ask():
                 "response": response,
                 "scraped": scraped_text,
                 "hasScraping": bool(scraped_text),
-                "showSourcesSeparately": True  # Flag to indicate sources should be shown separately
+                "web_sources": web_search_results.get("results", []) if web_search_results else [],
+                "hasWebSources": bool(web_search_results),
+                "showSourcesSeparately": not bool(web_search_results)  # Only show sources separately if no web results provided
             })
     
     except Exception as e:
@@ -403,6 +442,9 @@ def ask_about_video():
         data = request.json if request.json else {}
         user_query = data.get("query")
         video_analysis = data.get("video_analysis")
+        web_search_results = data.get("web_search_results")  # New: web search results from frontend
+        # Optional session id to keep conversations separated per video
+        session_id = data.get("session_id") or default_session_id
         
         if not user_query:
             return jsonify({"error": "No question provided"}), 400
@@ -461,11 +503,24 @@ def ask_about_video():
         - Transcript Sample: {audio_transcription.get('text', '')[:300]}
         """
         
-        # Generate response using video context
+        # Create full context including web search results if available
+        full_context = video_context
+        if web_search_results and web_search_results.get("results"):
+            web_content = "\n\nAdditional Web Information:\n"
+            if web_search_results.get("answer"):
+                web_content += f"AI Summary: {web_search_results['answer']}\n\n"
+            
+            for i, result in enumerate(web_search_results["results"][:3], 1):  # Use top 3 results for videos
+                web_content += f"{i}. {result.get('title', 'No title')}\n"
+                web_content += f"   Description: {result.get('snippet', result.get('content', 'No description'))[:150]}...\n\n"
+            
+            full_context += web_content
+        
+        # Generate response using video context + web context
         try:
             response = generate_response_without_retrieval(
-                default_session_id,
-                f"Based on this video analysis: {video_context}\n\nUser question: {user_query}",
+                session_id,
+                f"Based on this video analysis: {full_context}\n\nUser question: {user_query}",
                 "",
                 session_manager
             )
@@ -480,7 +535,9 @@ def ask_about_video():
         return jsonify({
             "response": response,
             "video_context": video_context,
-            "hasVideoAnalysis": True
+            "hasVideoAnalysis": True,
+            "web_sources": web_search_results.get("results", []) if web_search_results else [],
+            "hasWebSources": bool(web_search_results)
         })
     
     except Exception as e:
@@ -550,6 +607,9 @@ def ask_about_image():
         data = request.json if request.json else {}
         user_query = data.get("query")
         image_analysis = data.get("image_analysis")
+        web_search_results = data.get("web_search_results")  # New: web search results from frontend
+        # Optional session id to keep conversations separated per image
+        session_id = data.get("session_id") or default_session_id
         
         if not user_query:
             return jsonify({"error": "No question provided"}), 400
@@ -557,56 +617,89 @@ def ask_about_image():
         if not image_analysis:
             return jsonify({"error": "No image analysis provided"}), 400
         
-        # Create context from image analysis
+        # Create context from AI analysis
         metadata = image_analysis.get('metadata', {})
-        analysis = image_analysis.get('analysis', {})
-        brightness_analysis = analysis.get('brightness_analysis', {})
-        color_analysis = analysis.get('color_analysis', {})
-        object_detection = analysis.get('object_detection', {})
-        scene_classification = analysis.get('scene_classification', {})
+        ai_analysis = image_analysis.get('ai_analysis', {})
         
-        # Create image context
+        # Get basic metadata
         resolution = metadata.get('resolution', 'Unknown')
         file_size = metadata.get('file_size_mb', 'Unknown')
         aspect_ratio = metadata.get('aspect_ratio', 'Unknown')
         image_type = metadata.get('image_type', 'Unknown')
         
-        brightness_category = brightness_analysis.get('brightness_category', 'Unknown')
-        mean_brightness = brightness_analysis.get('mean_brightness', 'Unknown')
+        # Get AI analysis results
+        overall_description = ai_analysis.get('overall_description', 'No AI description available')
+        main_subjects = ai_analysis.get('main_subjects', [])
+        scene_type = ai_analysis.get('scene_type', 'Unknown')
+        colors_and_lighting = ai_analysis.get('colors_and_lighting', 'Unknown')
+        text_content = ai_analysis.get('text_content', 'No text detected')
+        emotions_or_mood = ai_analysis.get('emotions_or_mood', 'Unknown')
+        context_or_setting = ai_analysis.get('context_or_setting', 'Unknown')
+        notable_details = ai_analysis.get('notable_details', [])
+        educational_value = ai_analysis.get('educational_value', 'Unknown')
+        suggested_topics = ai_analysis.get('suggested_topics', [])
+        has_ai_analysis = ai_analysis.get('has_ai_analysis', False)
         
-        color_category = color_analysis.get('color_category', 'Unknown')
+        if has_ai_analysis:
+            image_context = f"""
+            AI Image Analysis:
+            - Overall Description: {overall_description}
+            - Main Subjects: {', '.join(main_subjects) if main_subjects else 'None identified'}
+            - Scene Type: {scene_type}
+            - Colors and Lighting: {colors_and_lighting}
+            - Text Content: {text_content}
+            - Emotions/Mood: {emotions_or_mood}
+            - Context/Setting: {context_or_setting}
+            - Notable Details: {', '.join(notable_details) if notable_details else 'None specified'}
+            - Educational Value: {educational_value}
+            - Suggested Topics: {', '.join(suggested_topics) if suggested_topics else 'None suggested'}
+            
+            Technical Details:
+            - Resolution: {resolution}
+            - File Size: {file_size}MB
+            - Aspect Ratio: {aspect_ratio}:1
+            - Image Type: {image_type}
+            """
+        else:
+            # Fallback to basic metadata if AI analysis failed
+            error_msg = ai_analysis.get('error', 'AI analysis unavailable')
+            image_context = f"""
+            Basic Image Information:
+            - Resolution: {resolution}
+            - File Size: {file_size}MB
+            - Aspect Ratio: {aspect_ratio}:1
+            - Image Type: {image_type}
+            - AI Analysis Status: {error_msg}
+            """
         
-        faces_detected = object_detection.get('faces_detected', 0)
-        has_people = object_detection.get('has_people', False)
+        # Create full context including web search results if available
+        full_context = image_context
+        if web_search_results and web_search_results.get("results"):
+            web_content = "\n\nAdditional Web Information:\n"
+            if web_search_results.get("answer"):
+                web_content += f"AI Summary: {web_search_results['answer']}\n\n"
+            
+            for i, result in enumerate(web_search_results["results"][:3], 1):  # Use top 3 results for images
+                web_content += f"{i}. {result.get('title', 'No title')}\n"
+                web_content += f"   Description: {result.get('snippet', result.get('content', 'No description'))[:150]}...\n\n"
+            
+            full_context += web_content
         
-        scene_type = scene_classification.get('scene_type', 'Unknown')
-        scene_confidence = scene_classification.get('confidence', 'Unknown')
-        
-        image_context = f"""
-        Image Analysis Context:
-        - Resolution: {resolution}
-        - File Size: {file_size}MB
-        - Aspect Ratio: {aspect_ratio}:1
-        - Image Type: {image_type}
-        - Brightness: {brightness_category} (mean: {mean_brightness})
-        - Color Tone: {color_category}
-        - People Detected: {faces_detected} face(s)
-        - Has People: {has_people}
-        - Scene Type: {scene_type} (confidence: {scene_confidence})
-        """
-        
-        # Generate response using image context
+        # Generate response using image context + web context
         try:
             response = generate_response_without_retrieval(
-                default_session_id,
-                f"Based on this image analysis: {image_context}\n\nUser question: {user_query}",
+                session_id,
+                f"Based on this image analysis: {full_context}\n\nUser question: {user_query}",
                 "",
                 session_manager
             )
         except Exception as e:
             print(f"Error generating image response: {e}")
             # Fallback response if AI generation fails
-            response = f"I can see you're asking about an image with the following characteristics:\n\n{image_context}\n\nHowever, I encountered an error while processing your question. Could you please rephrase your question about the image content?"
+            if has_ai_analysis:
+                response = f"I can see you're asking about an image. Here's what I can tell you from the analysis:\n\n{overall_description}\n\nHowever, I encountered an error while processing your specific question. Could you please rephrase your question about the image content?"
+            else:
+                response = f"I can see you've uploaded an image with the following technical specifications:\n\n{image_context}\n\nHowever, detailed AI analysis is currently unavailable, and I encountered an error while processing your question. Could you please rephrase your question?"
         
         # Convert response to speech
         say(response)
@@ -614,7 +707,10 @@ def ask_about_image():
         return jsonify({
             "response": response,
             "image_context": image_context,
-            "hasImageAnalysis": True
+            "hasImageAnalysis": True,
+            "hasAIAnalysis": has_ai_analysis,
+            "web_sources": web_search_results.get("results", []) if web_search_results else [],
+            "hasWebSources": bool(web_search_results)
         })
     
     except Exception as e:

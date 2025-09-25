@@ -199,10 +199,23 @@ def create_dviteey_prompt_with_history(session: ChatSession):
 
 # Markdown to HTML formatter
 def format_response(response):
-    """Converts AI response from Markdown to clean HTML."""
+    """Normalize AI response: trim, collapse excess whitespace, ensure neat Markdown lists."""
     if not response:
         return "No response from AI Tutor."
-    return mistune.markdown(response)
+    try:
+        # Normalize whitespace
+        text = str(response).strip()
+        # Collapse runs of blank lines to max 2
+        import re
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        # Ensure list bullets have a space after dash
+        text = re.sub(r"\n-([^\s-])", r"\n- \1", text)
+        # Ensure bold markers are closed (simple heuristic)
+        if text.count('**') % 2 == 1:
+            text += "**"
+        return text
+    except Exception:
+        return response
 
 
 # Function for standard response (without retrieval)

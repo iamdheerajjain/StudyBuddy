@@ -1,9 +1,35 @@
 import pyttsx3
 import multiprocessing
 import time
+from typing import List
 
 # Global variable to store speech process
 speech_process = None
+
+def _chunk_text(text: str, max_chars: int = 240) -> List[str]:
+    """Split text into natural chunks that TTS can speak clearly."""
+    if not text:
+        return []
+    separators = ['. ', '! ', '? ', '; ', ': ', ', ', '\n']
+    chunks: List[str] = []
+    current = ''
+    i = 0
+    while i < len(text):
+        current += text[i]
+        end_here = False
+        # Decide if we should break here based on separators or length
+        if any(current.endswith(sep) for sep in separators):
+            end_here = len(current) >= max_chars * 0.6  # break on sentence end past a threshold
+        if len(current) >= max_chars:
+            end_here = True
+        if end_here:
+            chunks.append(current.strip())
+            current = ''
+        i += 1
+    if current.strip():
+        chunks.append(current.strip())
+    return chunks
+
 
 def speak_text(text):
     engine = pyttsx3.init()
@@ -23,8 +49,10 @@ def speak_text(text):
     # Set the speech rate (default is usually ~200 words per minute)
     rate = engine.getProperty('rate')  # Get the current rate
     engine.setProperty('rate', rate - 25)  # Decrease the rate for slower speech
-    engine.say(text)
-    engine.runAndWait()
+    # Speak in manageable chunks for clarity and reliability
+    for segment in _chunk_text(text):
+        engine.say(segment)
+        engine.runAndWait()
 
 def say(text):
     global speech_process

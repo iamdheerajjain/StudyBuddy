@@ -75,12 +75,21 @@ class VideoProcessor:
             except Exception:
                 pass
             
+            # Prepare a preview frame (first analyzed frame) as base64 for UI
+            preview_base64 = None
+            try:
+                if frames:
+                    preview_base64 = self._encode_frame_to_base64(frames[0])
+            except Exception:
+                preview_base64 = None
+
             return {
                 "success": True,
                 "metadata": self._make_json_serializable(metadata),
                 "analysis": self._make_json_serializable(analysis),
                 "frame_count": len(frames),
-                "suggested_questions": self._generate_suggested_questions(analysis)
+                "suggested_questions": self._generate_suggested_questions(analysis),
+                "preview_frame_base64": preview_base64
             }
                 
         except Exception as e:
@@ -232,6 +241,27 @@ class VideoProcessor:
         finally:
             if cap is not None:
                 cap.release()
+
+    def _encode_frame_to_base64(self, frame: np.ndarray, target_width: int = 640) -> Optional[str]:
+        """Encode a single BGR frame to base64 JPEG for preview."""
+        try:
+            if frame is None or frame.size == 0:
+                return None
+            # Resize while maintaining aspect ratio
+            h, w = frame.shape[:2]
+            if w > target_width:
+                scale = target_width / float(w)
+                new_size = (int(w * scale), int(h * scale))
+                frame = cv2.resize(frame, new_size)
+            # Convert BGR to RGB then to PIL
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(rgb)
+            buffer = io.BytesIO()
+            pil_image.save(buffer, format='JPEG', quality=80)
+            img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return f"data:image/jpeg;base64,{img_str}"
+        except Exception:
+            return None
     
     def _analyze_video_content(self, frames: List[np.ndarray], metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze video frames for content understanding."""

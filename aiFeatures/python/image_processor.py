@@ -1,6 +1,6 @@
 """
-Image Processing Module for Mentorae
-Handles image analysis, content recognition, and metadata extraction
+Image Processing Module for Mentorae  
+Handles image analysis using Gemini AI model for comprehensive understanding
 """
 
 import cv2
@@ -13,31 +13,31 @@ import io
 import json
 from typing import List, Dict, Any, Optional
 import logging
-import pytesseract
-import requests
-from bs4 import BeautifulSoup
-import re
+import google.generativeai as genai
+from dotenv import load_dotenv
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 class ImageProcessor:
-    """Handles image processing, analysis, and content recognition."""
+    """Handles image processing and AI-powered analysis using Gemini."""
     
     def __init__(self):
         self.supported_formats = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
         self.max_file_size = 10 * 1024 * 1024  # 10MB limit
         self.max_dimension = 2048  # Maximum width or height
+        self._model = None
+        self._init_gemini_model()
     
     def process_image(self, image_file) -> Dict[str, Any]:
         """
-        Process uploaded image and extract meaningful content.
+        Process uploaded image using Gemini AI for comprehensive analysis.
         
         Args:
             image_file: Flask file object containing the image
             
         Returns:
-            Dict containing analysis results and extracted information
+            Dict containing AI analysis results and metadata
         """
         tmp_file_path = None
         try:
@@ -68,7 +68,7 @@ class ImageProcessor:
             # Save the file
             image_file.save(tmp_file_path)
             
-            # Load and process image
+            # Load image for basic metadata
             image = self._load_image(tmp_file_path)
             if image is None:
                 return {
@@ -76,21 +76,43 @@ class ImageProcessor:
                     "error": "Could not load image file"
                 }
             
-            # Extract image metadata
+            # Extract basic metadata
             metadata = self._extract_image_metadata(tmp_file_path, image)
             
-            # Analyze image content
-            analysis = self._analyze_image_content(image)
+            # Use Gemini AI for comprehensive image analysis
+            ai_analysis = self._analyze_with_gemini(tmp_file_path)
             
             # Generate base64 encoded image for display
             image_base64 = self._encode_image_to_base64(image)
             
+            # Derive an accessibility-friendly alt text from AI analysis
+            alt_text = None
+            try:
+                if isinstance(ai_analysis, dict):
+                    overall = ai_analysis.get('overall_description') or ''
+                    subjects = ai_analysis.get('main_subjects') or []
+                    scene = ai_analysis.get('scene_type') or ''
+                    notable = ai_analysis.get('notable_details') or []
+                    parts = []
+                    if overall:
+                        parts.append(overall)
+                    if subjects:
+                        parts.append(f"Subjects: {', '.join(subjects)}")
+                    if scene:
+                        parts.append(f"Scene: {scene}")
+                    if notable:
+                        parts.append(f"Details: {', '.join(notable[:3])}")
+                    alt_text = ". ".join(p for p in parts if p).strip() or None
+            except Exception:
+                alt_text = None
+            
             return {
                 "success": True,
                 "metadata": self._make_json_serializable(metadata),
-                "analysis": self._make_json_serializable(analysis),
+                "ai_analysis": ai_analysis,
                 "image_base64": image_base64,
-                "suggested_questions": self._generate_suggested_questions(analysis)
+                "suggested_questions": self._generate_suggested_questions_from_ai(ai_analysis),
+                "alt_text": alt_text
             }
                 
         except Exception as e:
@@ -182,290 +204,128 @@ class ImageProcessor:
             logger.error(f"Error extracting metadata: {e}")
             return {"error": f"Failed to extract metadata: {str(e)}"}
     
-    def _analyze_image_content(self, image: np.ndarray) -> Dict[str, Any]:
-        """Analyze image content for various characteristics."""
+    def _init_gemini_model(self):
+        """Initialize Gemini AI model for image analysis."""
         try:
-            analysis = {
-                "brightness_analysis": self._analyze_brightness(image),
-                "color_analysis": self._analyze_colors(image),
-                "edge_analysis": self._analyze_edges(image),
-                "texture_analysis": self._analyze_texture(image),
-                "object_detection": self._detect_objects(image),
-                "scene_classification": self._classify_scene(image),
-                "text_extraction": self._extract_text_from_image(image)
-            }
+            # Load environment variables
+            load_dotenv()
             
-            # Web scrape information about extracted labels
-            if analysis["text_extraction"].get("labels"):
-                analysis["label_research"] = self._web_scrape_label_info(analysis["text_extraction"]["labels"])
+            # Get API key from environment
+            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                logger.warning("No Gemini API key found. AI analysis will be disabled.")
+                self._model = None
+                return
             
-            return analysis
+            # Configure Gemini
+            genai.configure(api_key=api_key)
+            
+            # Initialize the model
+            self._model = genai.GenerativeModel('gemini-1.5-flash')
+            logger.info("Gemini model initialized successfully")
             
         except Exception as e:
-            logger.error(f"Content analysis failed: {e}")
-            return {"error": f"Content analysis failed: {str(e)}"}
+            logger.error(f"Failed to initialize Gemini model: {e}")
+            self._model = None
     
-    def _analyze_brightness(self, image: np.ndarray) -> Dict[str, float]:
-        """Analyze brightness levels in the image."""
+    def _analyze_with_gemini(self, image_path: str) -> Dict[str, Any]:
+        """Analyze image using Gemini AI model."""
         try:
-            # Convert to grayscale
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            
-            # Calculate brightness statistics
-            mean_brightness = np.mean(gray)
-            std_brightness = np.std(gray)
-            
-            # Determine brightness category
-            if mean_brightness < 85:
-                brightness_category = "dark"
-            elif mean_brightness < 170:
-                brightness_category = "medium"
-            else:
-                brightness_category = "bright"
-            
-            return {
-                "mean_brightness": float(mean_brightness),
-                "std_brightness": float(std_brightness),
-                "min_brightness": float(np.min(gray)),
-                "max_brightness": float(np.max(gray)),
-                "brightness_category": brightness_category
-            }
-        except Exception as e:
-            logger.error(f"Brightness analysis failed: {e}")
-            return {"error": str(e)}
-    
-    def _analyze_colors(self, image: np.ndarray) -> Dict[str, Any]:
-        """Analyze dominant colors in the image."""
-        try:
-            # Reshape image to be a list of pixels
-            pixels = image.reshape(-1, 3)
-            
-            # Calculate average color
-            avg_color = np.mean(pixels, axis=0)
-            
-            # Calculate color variance
-            color_variance = np.var(pixels, axis=0)
-            
-            # Determine dominant color
-            dominant_color = self._get_dominant_color(pixels)
-            
-            # Calculate colorfulness (variance of color channels)
-            colorfulness = np.mean(color_variance)
-            
-            return {
-                "average_color": [float(c) for c in avg_color],
-                "dominant_color": dominant_color,
-                "color_variance": [float(v) for v in color_variance],
-                "colorfulness": float(colorfulness),
-                "color_category": self._categorize_colors(avg_color)
-            }
-        except Exception as e:
-            logger.error(f"Color analysis failed: {e}")
-            return {"error": str(e)}
-    
-    def _get_dominant_color(self, pixels: np.ndarray) -> Dict[str, Any]:
-        """Get the most dominant color in the image."""
-        try:
-            # Simple approach: find the most common color
-            # Reshape and find unique colors
-            unique_colors, counts = np.unique(pixels.reshape(-1, 3), axis=0, return_counts=True)
-            dominant_idx = np.argmax(counts)
-            dominant_color = unique_colors[dominant_idx]
-            
-            return {
-                "rgb": [int(c) for c in dominant_color],
-                "hex": f"#{int(dominant_color[2]):02x}{int(dominant_color[1]):02x}{int(dominant_color[0]):02x}",
-                "percentage": float(counts[dominant_idx] / len(pixels) * 100)
-            }
-        except Exception as e:
-            logger.error(f"Dominant color detection failed: {e}")
-            return {"error": str(e)}
-    
-    def _categorize_colors(self, avg_color: np.ndarray) -> str:
-        """Categorize the overall color tone of the image."""
-        b, g, r = avg_color
-        
-        if r > g and r > b and r > 150:
-            return "warm_red"
-        elif g > r and g > b and g > 150:
-            return "warm_green"
-        elif b > r and b > g and b > 150:
-            return "cool_blue"
-        elif r > 200 and g > 200 and b > 200:
-            return "bright_white"
-        elif r < 50 and g < 50 and b < 50:
-            return "dark_black"
-        elif abs(r - g) < 30 and abs(g - b) < 30:
-            return "neutral_gray"
-        else:
-            return "mixed_colors"
-    
-    def _analyze_edges(self, image: np.ndarray) -> Dict[str, Any]:
-        """Analyze edge content in the image."""
-        try:
-            # Convert to grayscale
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            
-            # Apply Canny edge detection
-            edges = cv2.Canny(gray, 50, 150)
-            
-            # Calculate edge density
-            edge_pixels = np.sum(edges > 0)
-            total_pixels = edges.shape[0] * edges.shape[1]
-            edge_density = edge_pixels / total_pixels
-            
-            # Determine edge category
-            if edge_density < 0.05:
-                edge_category = "smooth"
-            elif edge_density < 0.15:
-                edge_category = "moderate_detail"
-            else:
-                edge_category = "high_detail"
-            
-            return {
-                "edge_density": float(edge_density),
-                "edge_pixels": int(edge_pixels),
-                "edge_category": edge_category
-            }
-        except Exception as e:
-            logger.error(f"Edge analysis failed: {e}")
-            return {"error": str(e)}
-    
-    def _analyze_texture(self, image: np.ndarray) -> Dict[str, Any]:
-        """Analyze texture patterns in the image."""
-        try:
-            # Convert to grayscale
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            
-            # Calculate texture using Laplacian variance
-            laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-            
-            # Determine texture category
-            if laplacian_var < 100:
-                texture_category = "smooth"
-            elif laplacian_var < 1000:
-                texture_category = "moderate_texture"
-            else:
-                texture_category = "rough_textured"
-            
-            return {
-                "texture_variance": float(laplacian_var),
-                "texture_category": texture_category
-            }
-        except Exception as e:
-            logger.error(f"Texture analysis failed: {e}")
-            return {"error": str(e)}
-    
-    def _detect_objects(self, image: np.ndarray) -> Dict[str, Any]:
-        """Basic object detection using OpenCV."""
-        try:
-            # Convert to grayscale
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            
-            # Use Haar cascades for basic object detection
-            # Face detection
-            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-            
-            # Eye detection
-            eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
-            eyes = eye_cascade.detectMultiScale(gray, 1.1, 4)
-            
-            return {
-                "faces_detected": len(faces),
-                "eyes_detected": len(eyes),
-                "has_people": len(faces) > 0,
-                "face_locations": [[int(x), int(y), int(w), int(h)] for (x, y, w, h) in faces],
-                "eye_locations": [[int(x), int(y), int(w), int(h)] for (x, y, w, h) in eyes]
-            }
-        except Exception as e:
-            logger.error(f"Object detection failed: {e}")
-            return {"error": str(e)}
-    
-    def _classify_scene(self, image: np.ndarray) -> Dict[str, Any]:
-        """Classify the type of scene in the image with more detailed analysis."""
-        try:
-            height, width = image.shape[:2]
-            
-            # Basic scene classification based on image characteristics
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            
-            # Calculate various features
-            brightness = np.mean(gray)
-            contrast = np.std(gray)
-            edge_density = np.sum(cv2.Canny(gray, 50, 150) > 0) / (height * width)
-            
-            # Enhanced classification logic
-            scene_type = "general_scene"
-            scene_description = "a general scene"
-            confidence = 0.5
-            
-            # Aspect ratio analysis
-            aspect_ratio = width / height
-            
-            # Brightness-based classification
-            if brightness > 200 and contrast < 50:
-                scene_type = "bright_scene"
-                scene_description = "a very bright scene, possibly outdoors in daylight or a well-lit indoor space"
-                confidence = 0.7
-            elif brightness < 50 and contrast < 30:
-                scene_type = "dark_scene"
-                scene_description = "a dark scene, possibly taken at night or in low lighting"
-                confidence = 0.7
-            elif brightness > 150 and contrast > 80:
-                scene_type = "high_contrast_scene"
-                scene_description = "a high-contrast scene with strong light and shadow"
-                confidence = 0.6
-            
-            # Edge density analysis
-            if edge_density > 0.15:
-                scene_type = "detailed_scene"
-                scene_description = "a detailed scene with many visual elements and sharp features"
-                confidence = 0.7
-            elif edge_density < 0.05:
-                scene_type = "smooth_scene"
-                scene_description = "a smooth scene with soft, blurred features"
-                confidence = 0.6
-            
-            # Aspect ratio analysis
-            if aspect_ratio > 1.5:
-                scene_type = "landscape_scene"
-                scene_description = "a landscape or wide-angle view"
-                confidence = 0.6
-            elif aspect_ratio < 0.8:
-                scene_type = "portrait_scene"
-                scene_description = "a portrait or tall view"
-                confidence = 0.6
-            
-            # Color analysis for scene context
-            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-            mean_hue = np.mean(hsv[:, :, 0])
-            mean_saturation = np.mean(hsv[:, :, 1])
-            
-            if mean_saturation > 100:  # High saturation
-                if 20 < mean_hue < 80:  # Green range
-                    scene_description += " with vibrant green colors, possibly nature or vegetation"
-                elif 100 < mean_hue < 140:  # Blue range
-                    scene_description += " with blue tones, possibly sky or water"
-                elif mean_hue < 20 or mean_hue > 160:  # Red range
-                    scene_description += " with warm red/orange tones"
-            
-            return {
-                "scene_type": scene_type,
-                "scene_description": scene_description,
-                "confidence": confidence,
-                "features": {
-                    "brightness": float(brightness),
-                    "contrast": float(contrast),
-                    "edge_density": float(edge_density),
-                    "aspect_ratio": float(aspect_ratio),
-                    "mean_hue": float(mean_hue),
-                    "mean_saturation": float(mean_saturation)
+            if self._model is None:
+                return {
+                    "error": "Gemini AI model not available. Please check API key configuration.",
+                    "has_ai_analysis": False
                 }
+            
+            # Load image for Gemini
+            pil_image = Image.open(image_path)
+            
+            # Create comprehensive analysis prompt
+            prompt = """
+            You are an expert AI image analyst. Please analyze this image comprehensively and provide a detailed description in JSON format with the following structure:
+            
+            {
+                "overall_description": "A detailed description of what you see in the image",
+                "main_subjects": ["list of main subjects or objects in the image"],
+                "scene_type": "type of scene (e.g., indoor, outdoor, portrait, landscape, etc.)",
+                "colors_and_lighting": "description of dominant colors and lighting conditions",
+                "text_content": "any visible text in the image",
+                "emotions_or_mood": "emotional tone or mood conveyed by the image",
+                "context_or_setting": "where and when this might have been taken",
+                "notable_details": ["list of interesting or important details"],
+                "educational_value": "what someone could learn from this image",
+                "suggested_topics": ["list of topics this image could be used to teach or discuss"]
             }
+            
+            Please be thorough and educational in your analysis. Focus on what would be useful for a tutor to know about this image.
+            """
+            
+            # Generate analysis
+            response = self._model.generate_content([prompt, pil_image])
+            
+            # Parse the response
+            if response and response.text:
+                try:
+                    # Extract JSON from response
+                    response_text = response.text.strip()
+                    
+                    # Remove markdown code blocks if present
+                    if response_text.startswith('```json'):
+                        response_text = response_text[7:-3].strip()
+                    elif response_text.startswith('```'):
+                        response_text = response_text[3:-3].strip()
+                    
+                    # Parse JSON
+                    analysis_data = json.loads(response_text)
+                    analysis_data["has_ai_analysis"] = True
+                    analysis_data["raw_response"] = response.text
+                    
+                    return analysis_data
+                    
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, return the raw text
+                    return {
+                        "overall_description": response.text,
+                        "has_ai_analysis": True,
+                        "raw_response": response.text,
+                        "parse_error": "Could not parse JSON, returning raw text"
+                    }
+            else:
+                return {
+                    "error": "No response from Gemini AI",
+                    "has_ai_analysis": False
+                }
+                
         except Exception as e:
-            logger.error(f"Scene classification failed: {e}")
-            return {"error": str(e)}
+            logger.error(f"Gemini analysis failed: {e}")
+            return {
+                "error": f"AI analysis failed: {str(e)}",
+                "has_ai_analysis": False
+            }
+    
+    def _generate_suggested_questions_from_ai(self, ai_analysis: Dict[str, Any]) -> List[str]:
+        """Generate suggested questions based on AI analysis."""
+        questions = [
+            "What can you tell me about this image?",
+            "Can you explain what's happening in this picture?",
+            "What educational value does this image have?"
+        ]
+        
+        # Add specific questions based on AI analysis
+        if ai_analysis.get("main_subjects"):
+            subjects = ai_analysis["main_subjects"]
+            if isinstance(subjects, list) and subjects:
+                questions.append(f"Can you tell me more about {subjects[0]}?")
+        
+        if ai_analysis.get("suggested_topics"):
+            topics = ai_analysis["suggested_topics"]
+            if isinstance(topics, list) and topics:
+                questions.append(f"How can this image help me learn about {topics[0]}?")
+        
+        if ai_analysis.get("text_content") and ai_analysis["text_content"].strip():
+            questions.append("What does the text in this image mean?")
+        
+        return questions[:5]  # Return max 5 questions
     
     def _encode_image_to_base64(self, image: np.ndarray) -> str:
         """Encode image to base64 for display in frontend."""
@@ -491,114 +351,6 @@ class ImageProcessor:
         except Exception as e:
             logger.error(f"Base64 encoding failed: {e}")
             return ""
-    
-    def _extract_text_from_image(self, image: np.ndarray) -> Dict[str, Any]:
-        """Extract text labels from image using OCR."""
-        try:
-            # Convert to PIL Image for better OCR results
-            pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-            
-            # Use pytesseract to extract text
-            extracted_text = pytesseract.image_to_string(pil_image, config='--psm 6')
-            
-            # Clean up the text
-            cleaned_text = re.sub(r'\s+', ' ', extracted_text.strip())
-            
-            # Split into individual labels/words
-            labels = [label.strip() for label in cleaned_text.split() if len(label.strip()) > 2]
-            
-            # Filter out common OCR noise
-            filtered_labels = []
-            for label in labels:
-                # Skip if it's mostly numbers or very short
-                if len(label) < 3 or label.isdigit():
-                    continue
-                # Skip common OCR artifacts
-                if not re.match(r'^[a-zA-Z0-9\s\-_\.]+$', label):
-                    continue
-                filtered_labels.append(label)
-            
-            return {
-                "raw_text": extracted_text,
-                "cleaned_text": cleaned_text,
-                "labels": filtered_labels,
-                "label_count": len(filtered_labels)
-            }
-        except Exception as e:
-            logger.error(f"Text extraction failed: {e}")
-            return {"error": str(e), "labels": [], "label_count": 0}
-    
-    def _web_scrape_label_info(self, labels: List[str]) -> Dict[str, Any]:
-        """Web scrape information about the extracted labels."""
-        try:
-            label_info = {}
-            
-            for label in labels[:5]:  # Limit to first 5 labels to avoid rate limiting
-                try:
-                    # Search for the label
-                    search_query = f"{label} definition meaning"
-                    search_url = f"https://www.google.com/search?q={search_query}"
-                    
-                    headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                    }
-                    
-                    response = requests.get(search_url, headers=headers, timeout=10)
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    
-                    # Extract definition or description
-                    definition = ""
-                    
-                    # Try to find definition in search results
-                    definition_elements = soup.find_all(['div', 'span'], string=re.compile(r'definition|meaning|is a|refers to', re.I))
-                    if definition_elements:
-                        definition = definition_elements[0].get_text()[:200] + "..."
-                    
-                    # If no definition found, try to get snippet
-                    if not definition:
-                        snippet_elements = soup.find_all('div', class_='BNeawe')
-                        if snippet_elements:
-                            definition = snippet_elements[0].get_text()[:200] + "..."
-                    
-                    label_info[label] = {
-                        "definition": definition if definition else f"Information about '{label}' not found",
-                        "search_successful": bool(definition)
-                    }
-                    
-                except Exception as e:
-                    logger.error(f"Web scraping failed for label '{label}': {e}")
-                    label_info[label] = {
-                        "definition": f"Could not find information about '{label}'",
-                        "search_successful": False
-                    }
-            
-            return label_info
-        except Exception as e:
-            logger.error(f"Web scraping failed: {e}")
-            return {"error": str(e)}
-
-    def _generate_suggested_questions(self, analysis: Dict[str, Any]) -> List[str]:
-        """Generate suggested questions based on image analysis."""
-        questions = [
-            "What labels or text can you see in this image?",
-            "Can you explain what these labels mean?",
-            "What information do these labels provide?"
-        ]
-        
-        # Add specific questions based on extracted labels
-        if analysis.get("text_extraction", {}).get("labels"):
-            labels = analysis["text_extraction"]["labels"]
-            if labels:
-                questions.append(f"Can you tell me more about '{labels[0]}'?")
-                if len(labels) > 1:
-                    questions.append(f"What is the relationship between '{labels[0]}' and '{labels[1]}'?")
-        
-        # Add questions based on web scraped information
-        if analysis.get("label_research"):
-            questions.append("What additional information can you find about these labels?")
-            questions.append("Are there any interesting facts about these terms?")
-        
-        return questions[:5]  # Return max 5 questions
 
 
 # Convenience function for easy integration
