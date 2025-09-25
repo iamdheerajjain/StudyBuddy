@@ -3,6 +3,10 @@ flask
 flask-cors
 python-dotenv
 
+# Production Server
+gunicorn
+gevent
+
 # AI/ML Libraries
 langchain
 langchain-google-genai
