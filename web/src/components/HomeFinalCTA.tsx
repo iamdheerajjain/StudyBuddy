@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { UserResponse } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabaseClient";
 import { ArrowRight } from "lucide-react";
 
@@ -10,8 +11,8 @@ export default function HomeFinalCTA() {
 
   useEffect(() => {
     const supabase = supabaseBrowser();
-    supabase.auth.getUser().then(({ data }) => {
-      setIsAuthed(Boolean(data.user));
+    supabase.auth.getUser().then(({ data }: UserResponse) => {
+      setIsAuthed(Boolean(data?.user));
     });
   }, []);
 
