@@ -1,8 +1,7 @@
 # AI Tutor StudyBuddy
 
 > An intelligent tutoring platform powered by AI, featuring RAG-based document understanding, multimodal content analysis, and natural language interactions.
-
-![StudyBuddy Demo](op1.png)
+---
 
 ## 🌟 Features
 
@@ -325,19 +324,3 @@ netstat -ano | findstr :5500
 # Install ffmpeg (see Prerequisites section)
 # Ensure ffmpeg is in your system PATH
 ```
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📧 Support
-
-For issues and questions, please open an issue on the GitHub repository.
-
----
-
-**Built with ❤️ using Next.js, Flask, and Google Gemini AI**
